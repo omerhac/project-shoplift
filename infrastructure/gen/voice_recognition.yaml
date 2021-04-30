@@ -1,0 +1,319 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: An example CloudFormation template for Fargate.
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-578d263c
+  SubnetA:
+    Type: AWS::EC2::Subnet::Id
+    Default: us-east-2a
+  SubnetB:
+    Type: AWS::EC2::Subnet::Id
+    Default: us-east-2b
+  Certificate:
+    Type: String
+    Default: arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000
+  Image:
+    Type: String
+    Default: tutum/hello-world:latest
+  ServiceName:
+    Type: String
+    Default: ShopliftVoiceRecognition
+  ContainerPort:
+    Type: Number
+    Default: 80
+  LoadBalancerPort:
+    Type: Number
+    Default: 443
+  HealthCheckPath:
+    Type: String
+    Default: /healthcheck
+  HostedZoneName:
+    Type: String
+    Default: drgoldmond.com
+  Subdomain:
+    Type: String
+    Default: shoplift
+  MinContainers:
+    Type: Number
+    Default: 2
+  MaxContainers:
+    Type: Number
+    Default: 10
+  AutoScalingTargetValue:
+    Type: Number
+    Default: 50
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - Cluster
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn: LogGroup
+    Properties:
+      Family:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - TaskDefinition
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+      - FARGATE
+      Cpu: 256
+      Memory: 0.5GB
+      ExecutionRoleArn:
+        Ref: ExecutionRole
+      TaskRoleArn:
+        Ref: TaskRole
+      ContainerDefinitions:
+      - Name:
+          Ref: ServiceName
+        Image:
+          Ref: Image
+        PortMappings:
+        - ContainerPort:
+            Ref: ContainerPort
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-region:
+              Ref: AWS::Region
+            awslogs-group:
+              Ref: LogGroup
+            awslogs-stream-prefix: ecs
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - ExecutionRole
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - TaskRole
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - AutoScalingRole
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: ecs-tasks.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - ContainerSecurityGroup
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort:
+          Ref: ContainerPort
+        ToPort:
+          Ref: ContainerPort
+        SourceSecurityGroupId:
+          Ref: LoadBalancerSecurityGroup
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - LoadBalancerSecurityGroup
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort:
+          Ref: LoadBalancerPort
+        ToPort:
+          Ref: LoadBalancerPort
+        CidrIp: 0.0.0.0/0
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn:
+    - ListenerHTTPS
+    Properties:
+      ServiceName:
+        Ref: ServiceName
+      Cluster:
+        Ref: Cluster
+      TaskDefinition:
+        Ref: TaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 2
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+          - Ref: SubnetA
+          - Ref: SubnetB
+          SecurityGroups:
+          - Ref: ContainerSecurityGroup
+      LoadBalancers:
+      - ContainerName:
+          Ref: ServiceName
+        ContainerPort:
+          Ref: ContainerPort
+        TargetGroupArn:
+          Ref: TargetGroup
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath:
+        Ref: HealthCheckPath
+      HealthCheckTimeoutSeconds: 5
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - TargetGroup
+      Port:
+        Ref: ContainerPort
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: 60
+      TargetType: ip
+      VpcId:
+        Ref: VPC
+  ListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - TargetGroupArn:
+          Ref: TargetGroup
+        Type: forward
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port:
+        Ref: LoadBalancerPort
+      Protocol: HTTPS
+      Certificates:
+      - CertificateArn:
+          Ref: Certificate
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: 60
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: ServiceName
+          - LoadBalancer
+      Scheme: internet-facing
+      SecurityGroups:
+      - Ref: LoadBalancerSecurityGroup
+      Subnets:
+      - Ref: SubnetA
+      - Ref: SubnetB
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName:
+        Fn::Join:
+        - ''
+        - - Ref: HostedZoneName
+          - .
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Subdomain
+          - .
+          - Ref: HostedZoneName
+          - .
+      Type: A
+      AliasTarget:
+        DNSName:
+          Fn::GetAtt:
+          - LoadBalancer
+          - DNSName
+        HostedZoneId:
+          Fn::GetAtt:
+          - LoadBalancer
+          - CanonicalHostedZoneID
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+        - ''
+        - - /ecs/
+          - Ref: ServiceName
+          - TaskDefinition
+  Target:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity:
+        Ref: MinContainers
+      MaxCapacity:
+        Ref: MaxContainers
+      ResourceId:
+        Fn::Join:
+        - /
+        - - service
+          - Ref: Cluster
+          - Fn::GetAtt:
+            - Service
+            - Name
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      RoleARN:
+        Fn::GetAtt:
+        - AutoScalingRole
+        - Arn
+Outputs:
+  Endpoint:
+    Description: Endpoint
+    Value:
+      Fn::Join:
+      - ''
+      - - https://
+        - Ref: DNSRecord
