@@ -6,19 +6,16 @@ Parameters:
     Default: vpc-578d263c
   SubnetA:
     Type: AWS::EC2::Subnet::Id
-    Default: us-east-2a
+    Default: subnet-21b2bb5b
   SubnetB:
     Type: AWS::EC2::Subnet::Id
-    Default: us-east-2b
-  Certificate:
-    Type: String
-    Default: arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000
+    Default: subnet-ea29fa81
   Image:
     Type: String
     Default: tutum/hello-world:latest
   ServiceName:
     Type: String
-    Default: ShopliftVoiceRecognition
+    Default: VoiceRecognition
   ContainerPort:
     Type: Number
     Default: 80
@@ -170,7 +167,7 @@ Resources:
   Service:
     Type: AWS::ECS::Service
     DependsOn:
-    - ListenerHTTPS
+    - ListenerHTTP
     Properties:
       ServiceName:
         Ref: ServiceName
@@ -222,7 +219,7 @@ Resources:
       TargetType: ip
       VpcId:
         Ref: VPC
-  ListenerHTTPS:
+  ListenerHTTP:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
@@ -233,10 +230,7 @@ Resources:
         Ref: LoadBalancer
       Port:
         Ref: LoadBalancerPort
-      Protocol: HTTPS
-      Certificates:
-      - CertificateArn:
-          Ref: Certificate
+      Protocol: HTTP
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:

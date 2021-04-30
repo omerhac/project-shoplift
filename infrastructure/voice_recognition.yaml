@@ -6,14 +6,11 @@ Parameters:
     Default: vpc-578d263c
   SubnetA:
     Type: AWS::EC2::Subnet::Id
-    Default: us-east-2a
+    Default: subnet-21b2bb5b
   SubnetB:
     Type: AWS::EC2::Subnet::Id
-    Default: us-east-2b
-  Certificate:
-    Type: String
-    # Update with the certificate ARN from Certificate Manager, which must exist in the same region.
-    Default: 'arn:aws:acm:region:123456789012:certificate/00000000-0000-0000-0000-000000000000'
+    Default: subnet-ea29fa81
+
   Image:
     Type: String
     # Update with the Docker image. "You can use images in the Docker Hub registry or specify other repositories (repository-url/image:tag)."
@@ -21,7 +18,7 @@ Parameters:
   ServiceName:
     Type: String
     # update with the name of the service
-    Default: ShopliftVoiceRecognition
+    Default: VoiceRecognition
   ContainerPort:
     Type: Number
     Default: 80
@@ -160,7 +157,7 @@ Resources:
     Type: AWS::ECS::Service
     # This dependency is needed so that the load balancer is setup correctly in time
     DependsOn:
-      - ListenerHTTPS
+      - ListenerHTTP
     Properties: 
       ServiceName: !Ref ServiceName
       Cluster: !Ref Cluster
@@ -202,7 +199,7 @@ Resources:
           Value: 60 # default is 300
       TargetType: ip
       VpcId: !Ref VPC
-  ListenerHTTPS:
+  ListenerHTTP:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
@@ -210,9 +207,8 @@ Resources:
           Type: forward
       LoadBalancerArn: !Ref LoadBalancer
       Port: !Ref LoadBalancerPort
-      Protocol: HTTPS
-      Certificates:
-        - CertificateArn: !Ref Certificate
+      Protocol: HTTP
+
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
