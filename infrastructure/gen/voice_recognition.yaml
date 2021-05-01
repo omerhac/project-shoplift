@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: An example CloudFormation template for Fargate.
+Description: Voice Recogintion for Shoplift stack template
 Parameters:
   VPC:
     Type: AWS::EC2::VPC::Id
@@ -21,7 +21,7 @@ Parameters:
     Default: 80
   LoadBalancerPort:
     Type: Number
-    Default: 443
+    Default: 80
   HealthCheckPath:
     Type: String
     Default: /healthcheck

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: An example CloudFormation template for Fargate.
+Description: Voice Recogintion for Shoplift stack template
 Parameters:
   VPC:
     Type: AWS::EC2::VPC::Id
@@ -46,6 +46,7 @@ Parameters:
   AutoScalingTargetValue:
     Type: Number
     Default: 50
+
 Resources:
   Cluster:
     Type: AWS::ECS::Cluster
