@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+    Generator: "former2"
+Description: ""
+Resources:
+    ApiGatewayRestApi:
+        Type: "AWS::ApiGateway::RestApi"
+        Properties:
+            Name: !Sub "${LambdaFunction}API"
+            Description: "API to access Shoplift order processing logic"
+            ApiKeySourceType: "HEADER"
+            EndpointConfiguration:
+                Types:
+                  - "REGIONAL"
+
+    LambdaFunction:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Description: ""
+            FunctionName: "ShopliftOrderProcess"
+            Handler: "index.handler"
+            Code:
+                ZipFile: |
+                    def handler(event,context):
+                      return {
+                        'body': 'Hello there {0}'.format(event['requestContext']['identity']['sourceIp']),
+                        'headers': {
+                          'Content-Type': 'text/plain'
+                        },
+                        'statusCode': 200
+                      }
+            MemorySize: 128
+            Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/service-role/ShopliftOrderProcess-role-srxy7u6e"
+            Runtime: "python3.8"
+            Timeout: 3
+            TracingConfig:
+                Mode: "PassThrough"
+
+    ApiGatewayStage:
+        Type: "AWS::ApiGateway::Stage"
+        Properties:
+            StageName: "prod"
+            DeploymentId: !Ref ApiGatewayDeployment
+            RestApiId: !Ref ApiGatewayRestApi
+            Description: "production API"
+            CacheClusterEnabled: false
+            TracingEnabled: false
+
+    ApiGatewayDeployment:
+        Type: "AWS::ApiGateway::Deployment"
+        DependsOn:
+            - ApiGatewayMethod
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+
+    ApiGatewayMethod:
+        Type: "AWS::ApiGateway::Method"
+        Properties:
+            RestApiId: !Ref ApiGatewayRestApi
+            ResourceId: !GetAtt ApiGatewayRestApi.RootResourceId
+            HttpMethod: "GET"
+            AuthorizationType: "NONE"
+            ApiKeyRequired: false
+            RequestParameters: {}
+            MethodResponses:
+              -
+                ResponseModels:
+                    "application/json": "Empty"
+                StatusCode: "200"
+            Integration:
+                CacheNamespace: !GetAtt ApiGatewayRestApi.RootResourceId
+                ContentHandling: "CONVERT_TO_TEXT"
+                IntegrationHttpMethod: "POST"
+                IntegrationResponses:
+                  -
+                    ResponseTemplates: {}
+                    StatusCode: "200"
+                PassthroughBehavior: "WHEN_NO_MATCH"
+                TimeoutInMillis: 29000
+                Type: "AWS_PROXY"
+                Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}/invocations"
+
+    LambdaPermission:
+        Type: "AWS::Lambda::Permission"
+        Properties:
+            Action: "lambda:InvokeFunction"
+            FunctionName: !GetAtt LambdaFunction.Arn
+            Principal: "apigateway.amazonaws.com"
+            SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/GET/"

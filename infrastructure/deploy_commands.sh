@@ -8,8 +8,8 @@ aws cloudformation deploy --template-file /Users/home/PycharmProjects/shoplift/i
  --capabilities CAPABILITY_NAMED_IAM
 
 # package order processing stack
-aws cloudformation package --s3-bucket project-shoplift --template-file infrastructure/order_proccess.yaml --output-template-file infrastructure/gen/order_proccess.yaml
+aws cloudformation package --s3-bucket project-shoplift --template-file infrastructure/order_process.yaml --output-template-file infrastructure/gen/order_proccess.yaml
 
 # deploy order processing stack
-aws cloudformation deploy --template-file /Users/home/PycharmProjects/shoplift/infrastructure/gen/order_proccess.yaml --stack-name ShopliftOrderProcess \
+aws cloudformation deploy --template-file /Users/home/PycharmProjects/shoplift/infrastructure/gen/order_process.yaml --stack-name ShopliftOrderProcess \
  --capabilities CAPABILITY_NAMED_IAM
